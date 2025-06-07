@@ -1,11 +1,4 @@
-"use client";                           // 🔑  make the whole file a client component
-
-/* app/(auth)/login/page.tsx
-   ────────────────────────────────────────────────────────────────
-   Custom sign-in screen that offers:
-     • Google OAuth  (one-click)
-     • Optional e-mail / password form
-*/
+"use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
@@ -13,19 +6,18 @@ import { FormEvent, useEffect, useState } from "react";
 
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 
-/* ----------  Page component (client)  ---------- */
 export default function LoginPage() {
-  // redirect if already logged-in
   const { data: session, status } = useSession();
   const router = useRouter();
+  const params = useSearchParams();
+  const callbackUrl = params.get("callbackUrl") ?? "/";
 
   useEffect(() => {
     if (status === "authenticated") {
-      router.replace("/"); // bounce to home
+      router.replace(callbackUrl);
     }
-  }, [status, router]);
+  }, [status, callbackUrl, router]);
 
-  // while session is loading just show nothing
   if (status === "loading") return null;
 
   return (
@@ -35,34 +27,27 @@ export default function LoginPage() {
         Use Google or your e-mail and password to sign in
       </p>
 
-      {/* ─── Google OAuth button ─────────────────────────── */}
       <GoogleSignInButton />
 
-      {/* separator line */}
       <div className="my-6 flex items-center gap-4">
         <span className="h-px flex-1 bg-gray-200" />
         <span className="text-xs text-gray-500">or</span>
         <span className="h-px flex-1 bg-gray-200" />
       </div>
 
-      {/* ─── Email / Password form ───────────────────────── */}
-      <CredentialsForm />
+      <CredentialsForm callbackUrl={callbackUrl} />
     </div>
   );
 }
 
-/* ----------  Client sub-component for creds form  ---------- */
-function CredentialsForm() {
+function CredentialsForm({ callbackUrl }: { callbackUrl: string }) {
   const [loading, setLoading] = useState(false);
-  const params = useSearchParams();
-  const callbackUrl = params.get("callbackUrl") ?? "/";
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
     const email = (form.elements.namedItem("email") as HTMLInputElement).value;
-    const password = (form.elements.namedItem("password") as HTMLInputElement)
-      .value;
+    const password = (form.elements.namedItem("password") as HTMLInputElement).value;
 
     setLoading(true);
     await signIn("credentials", { email, password, callbackUrl });
