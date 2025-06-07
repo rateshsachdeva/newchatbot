@@ -1,77 +1,105 @@
-'use client';
+/* app/(auth)/login/page.tsx
+   ────────────────────────────────────────────────────────────────
+   Custom sign-in screen that offers:
+     • Google OAuth  (one-click)
+     • Optional e-mail / password form
+*/
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useActionState, useEffect, useState } from 'react';
-import { toast } from '@/components/toast';
+import { redirect } from "next/navigation";
+import { auth } from "@/app/(auth)/auth";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 
-import { AuthForm } from '@/components/auth-form';
-import { SubmitButton } from '@/components/submit-button';
+import { useSearchParams } from "next/navigation";
+import { signIn } from "next-auth/react";
+import { FormEvent, useState } from "react";
 
-import { login, type LoginActionState } from '../actions';
-import { useSession } from 'next-auth/react';
-
-export default function Page() {
-  const router = useRouter();
-
-  const [email, setEmail] = useState('');
-  const [isSuccessful, setIsSuccessful] = useState(false);
-
-  const [state, formAction] = useActionState<LoginActionState, FormData>(
-    login,
-    {
-      status: 'idle',
-    },
-  );
-
-  const { update: updateSession } = useSession();
-
-  useEffect(() => {
-    if (state.status === 'failed') {
-      toast({
-        type: 'error',
-        description: 'Invalid credentials!',
-      });
-    } else if (state.status === 'invalid_data') {
-      toast({
-        type: 'error',
-        description: 'Failed validating your submission!',
-      });
-    } else if (state.status === 'success') {
-      setIsSuccessful(true);
-      updateSession();
-      router.refresh();
-    }
-  }, [state.status]);
-
-  const handleSubmit = (formData: FormData) => {
-    setEmail(formData.get('email') as string);
-    formAction(formData);
-  };
+/* ----------  Page wrapper (Server Component)  ---------- */
+export default async function LoginPage() {
+  // If already logged-in, bounce to home
+  const session = await auth();
+  if (session?.user) redirect("/");
 
   return (
-    <div className="flex h-dvh w-screen items-start pt-12 md:pt-0 md:items-center justify-center bg-background">
-      <div className="w-full max-w-md overflow-hidden rounded-2xl flex flex-col gap-12">
-        <div className="flex flex-col items-center justify-center gap-2 px-4 text-center sm:px-16">
-          <h3 className="text-xl font-semibold dark:text-zinc-50">Sign In</h3>
-          <p className="text-sm text-gray-500 dark:text-zinc-400">
-            Use your email and password to sign in
-          </p>
-        </div>
-        <AuthForm action={handleSubmit} defaultEmail={email}>
-          <SubmitButton isSuccessful={isSuccessful}>Sign in</SubmitButton>
-          <p className="text-center text-sm text-gray-600 mt-4 dark:text-zinc-400">
-            {"Don't have an account? "}
-            <Link
-              href="/register"
-              className="font-semibold text-gray-800 hover:underline dark:text-zinc-200"
-            >
-              Sign up
-            </Link>
-            {' for free.'}
-          </p>
-        </AuthForm>
+    <div className="mx-auto flex max-w-sm flex-col gap-6 py-12">
+      <h1 className="text-center text-2xl font-semibold">Sign In</h1>
+      <p className="text-center text-sm text-gray-500">
+        Use Google or your e-mail and password to sign in
+      </p>
+
+      {/* ─── Google OAuth button ─────────────────────────── */}
+      <GoogleSignInButton />
+
+      {/* separator line */}
+      <div className="my-6 flex items-center gap-4">
+        <span className="h-px flex-1 bg-gray-200" />
+        <span className="text-xs text-gray-500">or</span>
+        <span className="h-px flex-1 bg-gray-200" />
       </div>
+
+      {/* ─── Email / Password form ───────────────────────── */}
+      <CredentialsForm />
     </div>
+  );
+}
+
+/* ----------  Client sub-component for creds form  ---------- */
+function CredentialsForm() {
+  "use client";
+
+  const [loading, setLoading] = useState(false);
+  const params = useSearchParams();
+  const callbackUrl = params.get("callbackUrl") ?? "/";
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const email = (form.elements.namedItem("email") as HTMLInputElement).value;
+    const password = (form.elements.namedItem("password") as HTMLInputElement)
+      .value;
+
+    setLoading(true);
+    await signIn("credentials", { email, password, callbackUrl });
+    setLoading(false);
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <label htmlFor="email" className="text-sm font-medium">
+          Email Address
+        </label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          required
+          placeholder="user@acme.com"
+          className="rounded-md border px-3 py-2 outline-none focus:ring-2 focus:ring-black/60"
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label htmlFor="password" className="text-sm font-medium">
+          Password
+        </label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          required
+          className="rounded-md border px-3 py-2 outline-none focus:ring-2 focus:ring-black/60"
+        />
+      </div>
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="mt-2 rounded-md bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+      >
+        {loading ? "Signing in…" : "Sign in"}
+      </button>
+    </form>
   );
 }
