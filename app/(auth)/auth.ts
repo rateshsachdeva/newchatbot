@@ -1,15 +1,8 @@
 // app/(auth)/auth.ts
 //-------------------------------------------------------------------
-// Next-Auth v5 configuration for:
-// • Google OAuth (loads AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET automatically)
-// • Optional e-mail/password credentials login
-// • Optional anonymous “guest” login
-// • JWT sessions (no DB needed for session storage)
-//-------------------------------------------------------------------
-
 import { compare } from "bcrypt-ts";
 import NextAuth, { type DefaultSession } from "next-auth";
-import Google from "next-auth/providers/google";
+import Google      from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 
 import { createGuestUser, getUser } from "@/lib/db/queries";
@@ -17,9 +10,7 @@ import { authConfig } from "./auth.config";
 import { DUMMY_PASSWORD } from "@/lib/constants";
 import type { DefaultJWT } from "next-auth/jwt";
 
-/* ------------------------------------------------------------------
-   Extra typings so `session.user` carries `id` + `type`
-------------------------------------------------------------------- */
+/* ─── Extra typings so session.user carries id + type ─────────────────── */
 export type UserType = "guest" | "regular";
 
 declare module "next-auth" {
@@ -29,11 +20,10 @@ declare module "next-auth" {
   interface User {
     id?: string;
     email?: string | null;
-    type: UserType;
     password?: string | null;
+    type: UserType;
   }
 }
-
 declare module "next-auth/jwt" {
   interface JWT extends DefaultJWT {
     id: string;
@@ -41,41 +31,30 @@ declare module "next-auth/jwt" {
   }
 }
 
-/* ------------------------------------------------------------------
-   Auth.js (Next-Auth v5) setup
-------------------------------------------------------------------- */
-export const {
-  GET,          // for App Router route handler re-export
-  POST,
-  auth,         // `auth()` helper in server components
-  signIn,
-  signOut,
-} = NextAuth({
-  ...authConfig, // keep whatever pages / theme settings you already had
+/* ─── Auth.js v5 (NextAuth) configuration ─────────────────────────────── */
+const nextAuth = NextAuth({
+  ...authConfig,
 
-  // ---------- Providers ----------------------------------------------------
   providers: [
     /* Google OAuth 2.0 */
     Google,
 
-    /* Email + password (remove if you don’t need it) */
+    /* Email + password (remove if not needed) */
     Credentials({
       name: "Credentials",
       credentials: {
-        email: { label: "E-mail", type: "text" },
+        email:    { label: "E-mail",   type: "text"     },
         password: { label: "Password", type: "password" },
       },
-      async authorize(creds) {
-        /* `creds` is Record<string, unknown> | undefined in v5 */
-        const email = (creds?.email as string | undefined) ?? "";
+      async authorize(creds): Promise<any | null> {
+        const email    = (creds?.email as string | undefined)    ?? "";
         const password = (creds?.password as string | undefined) ?? "";
 
         if (!email || !password) return null;
 
         const users = await getUser(email);
         if (users.length === 0) {
-          // Constant-time dummy compare prevents timing attacks
-          await compare(password, DUMMY_PASSWORD);
+          await compare(password, DUMMY_PASSWORD); // constant-time dummy
           return null;
         }
 
@@ -90,7 +69,7 @@ export const {
       },
     }),
 
-    /* One-click anonymous / guest login (remove if you don’t need it) */
+    /* Anonymous “guest” login (remove if not needed) */
     Credentials({
       id: "guest",
       name: "Continue as guest",
@@ -102,26 +81,29 @@ export const {
     }),
   ],
 
-  // ---------- Session / JWT -----------------------------------------------
   session: { strategy: "jwt" },
 
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = (user as any).id;
+        token.id   = (user as any).id;
         token.type = (user as any).type;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).id = token.id;
+        (session.user as any).id   = token.id;
         (session.user as any).type = token.type;
       }
       return session;
     },
   },
 
-  // ---------- Secret used to sign JWT & cookies ----------------------------
   secret: process.env.AUTH_SECRET,
 });
+
+/* ─── Exports expected by the App Router ──────────────────────────────── */
+export const GET  = nextAuth.handlers.GET;
+export const POST = nextAuth.handlers.POST;
+export const { auth, signIn, signOut } = nextAuth;
