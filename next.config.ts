@@ -1,19 +1,15 @@
-import type { NextConfig } from 'next';
+// next.config.ts
+import type { NextConfig } from "next";
 
+/** Global Next.js configuration */
 const nextConfig: NextConfig = {
   experimental: {
+    // keep any experimental flags you were already using
     ppr: true,
   },
-  images: {
-    remotePatterns: [
-      {
-        hostname: 'avatar.vercel.sh',
-      },
-    ],
-  },
-};
+
+  /* ✅ NEW: don’t let ESLint block the Vercel production build */
   eslint: {
-    // Skip ESLint errors during the production build on Vercel
     ignoreDuringBuilds: true,
   },
 };
