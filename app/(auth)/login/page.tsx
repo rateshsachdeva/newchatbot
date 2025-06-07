@@ -1,3 +1,5 @@
+"use client";                           // 🔑  make the whole file a client component
+
 /* app/(auth)/login/page.tsx
    ────────────────────────────────────────────────────────────────
    Custom sign-in screen that offers:
@@ -5,19 +7,26 @@
      • Optional e-mail / password form
 */
 
-import { redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
+import { useSearchParams, useRouter } from "next/navigation";
+import { signIn, useSession } from "next-auth/react";
+import { FormEvent, useEffect, useState } from "react";
+
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 
-import { useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
-import { FormEvent, useState } from "react";
+/* ----------  Page component (client)  ---------- */
+export default function LoginPage() {
+  // redirect if already logged-in
+  const { data: session, status } = useSession();
+  const router = useRouter();
 
-/* ----------  Page wrapper (Server Component)  ---------- */
-export default async function LoginPage() {
-  // If already logged-in, bounce to home
-  const session = await auth();
-  if (session?.user) redirect("/");
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.replace("/"); // bounce to home
+    }
+  }, [status, router]);
+
+  // while session is loading just show nothing
+  if (status === "loading") return null;
 
   return (
     <div className="mx-auto flex max-w-sm flex-col gap-6 py-12">
@@ -44,8 +53,6 @@ export default async function LoginPage() {
 
 /* ----------  Client sub-component for creds form  ---------- */
 function CredentialsForm() {
-  "use client";
-
   const [loading, setLoading] = useState(false);
   const params = useSearchParams();
   const callbackUrl = params.get("callbackUrl") ?? "/";
