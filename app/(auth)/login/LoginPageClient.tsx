@@ -10,7 +10,7 @@ export default function LoginPageClient() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const params = useSearchParams();
-  const callbackUrl = params.get("callbackUrl") ?? "/";
+  const callbackUrl = params.get("callbackUrl") ?? "/chat";
 
   useEffect(() => {
     if (status === "authenticated") {
